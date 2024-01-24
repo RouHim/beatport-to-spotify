@@ -9,7 +9,6 @@ import com.wrapper.spotify.model_objects.credentials.AuthorizationCodeCredential
 import com.wrapper.spotify.model_objects.specification.Playlist;
 import com.wrapper.spotify.model_objects.specification.PlaylistSimplified;
 import com.wrapper.spotify.model_objects.specification.Track;
-import de.rouhim.bts.Main;
 import de.rouhim.bts.domain.BeatportPlaylist;
 import de.rouhim.bts.domain.BeatportTrack;
 import de.rouhim.bts.imaging.CoverImageGenerator;
@@ -97,6 +96,11 @@ public class SpotifyService {
         if (playlistId.isEmpty()) {
             System.out.println("No playlist found, creating:" + sourceUrl);
             playlistId = createPlaylist(playlistTitle, sourceUrl);
+
+            if (playlistId.isPresent() && Settings.readBool(Settings.EnvValue.GENERATE_COVER_IMAGE)) {
+                System.out.println("Set cover image to spotify playlist");
+                setCoverImageToPlaylist(playlistTitle, playlistId.get());
+            }
         }
 
         if (playlistId.isPresent()) {
@@ -108,17 +112,12 @@ public class SpotifyService {
 
             System.out.println("Adding tracks to spotify playlist");
             addTracksToPlaylist(playlist, beatportPlaylist.tracks());
-
-            if (Settings.readBool(Settings.EnvValue.GENERATE_COVER_IMAGE)) {
-                System.out.println("Set cover image to spotify playlist");
-                setCoverImageToPlaylist(playlist, playlistTitle);
-            }
         } else {
             System.out.println("Could not create a playlist for: " + sourceUrl);
         }
     }
 
-    private void setCoverImageToPlaylist(Playlist playlist, String playlistTitle) throws IOException, SpotifyWebApiException {
+    private void setCoverImageToPlaylist(String playlistTitle, String playlistId) throws IOException, SpotifyWebApiException {
         // Base64 encoded JPEG image data, maximum payload size is 256 KB.
         String rawPlaylistTitle = playlistTitle
                 .replace(" - Beatport Top 100", "");
@@ -140,7 +139,7 @@ public class SpotifyService {
                 .replace("++", "+");
         byte[] bytes = CoverImageGenerator.generateImage(imageKeywords, rawPlaylistTitle);
         String encodedImage = new String(Base64.encodeBase64(bytes), StandardCharsets.UTF_8);
-        spotifyApi.uploadCustomPlaylistCoverImage(playlist.getId())
+        spotifyApi.uploadCustomPlaylistCoverImage(playlistId)
                 .image_data(encodedImage)
                 .build().execute();
     }
