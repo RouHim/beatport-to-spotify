@@ -1,4 +1,4 @@
-package de.rouhim.bts.utils;
+package de.rouhim.bts.settings;
 
 import org.apache.commons.io.FileUtils;
 

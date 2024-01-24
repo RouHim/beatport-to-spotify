@@ -9,13 +9,10 @@ import com.wrapper.spotify.model_objects.credentials.AuthorizationCodeCredential
 import com.wrapper.spotify.model_objects.specification.Playlist;
 import com.wrapper.spotify.model_objects.specification.PlaylistSimplified;
 import com.wrapper.spotify.model_objects.specification.Track;
-import de.rouhim.bts.domain.BeatportPlaylist;
-import de.rouhim.bts.domain.BeatportTrack;
-import de.rouhim.bts.imaging.CoverImageGenerator;
-import de.rouhim.bts.utils.QueryBuilder;
-import de.rouhim.bts.utils.Settings;
-import de.rouhim.bts.utils.SpotifyTrackCache;
-import de.rouhim.bts.utils.Utils;
+import de.rouhim.bts.beatport.BeatportPlaylist;
+import de.rouhim.bts.beatport.BeatportTrack;
+import de.rouhim.bts.image.CoverImageGenerator;
+import de.rouhim.bts.settings.Settings;
 import org.apache.commons.codec.binary.Base64;
 import org.jsoup.internal.StringUtil;
 
@@ -26,13 +23,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.Scanner;
 
 public class SpotifyService {
     private static final String clientId = "1acc388cd9384d21a1d61fb90c4dca89";
     private static final String clientSecret = "469897456daa4f7587ede94f421f60b8";
     private static final URI redirectUri = SpotifyHttpManager.makeUri("https://www.it-lobby.de/");
     private SpotifyApi spotifyApi;
+
+    public static String readInput(String enterMessage) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println(enterMessage);
+        return scanner.next();
+    }
 
     public void initialize() throws IOException, SpotifyWebApiException {
         //https://github.com/thelinmichael/spotify-web-api-java
@@ -64,7 +67,7 @@ public class SpotifyService {
 
         System.out.println("Visit: " + authUrl.toString());
 
-        String code = Utils.readInput("Enter code:");
+        String code = readInput("Enter code:");
 
         AuthorizationCodeCredentials authorizationCodeCredentials = spotifyApi.authorizationCode(code)
                 .build().execute();
@@ -137,7 +140,7 @@ public class SpotifyService {
                 .trim();
         String imageKeywords = String.join("+", coverSearchQuery.split(" ")) + "+club"
                 .replace("++", "+");
-        byte[] bytes = CoverImageGenerator.generateImage(imageKeywords, rawPlaylistTitle);
+        byte[] bytes = CoverImageGenerator.generateImage(rawPlaylistTitle);
         String encodedImage = new String(Base64.encodeBase64(bytes), StandardCharsets.UTF_8);
         spotifyApi.uploadCustomPlaylistCoverImage(playlistId)
                 .image_data(encodedImage)
@@ -170,7 +173,7 @@ public class SpotifyService {
         JsonArray tracksToDelete = new JsonArray(100);
         Arrays.stream(playlist.getTracks().getItems())
                 .map(track -> track.getTrack().getUri())
-                .collect(Collectors.toList())
+                .toList()
                 .forEach(track -> {
                     JsonObject element = new JsonObject();
                     element.addProperty("uri", track);
@@ -188,7 +191,7 @@ public class SpotifyService {
 
         for (BeatportTrack beatportTrack : beatportTracks) {
             // TODO: Use library to search by artist and trackname not fuzzy query
-            String searchQuery = QueryBuilder.build(beatportTrack);
+            String searchQuery = SpotifyQueryBuilder.build(beatportTrack);
             Optional<String> maybeSpotifyUri = SpotifyTrackCache.get(searchQuery);
 
             if (maybeSpotifyUri.isPresent()) {

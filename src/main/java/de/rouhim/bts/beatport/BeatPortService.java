@@ -1,7 +1,5 @@
 package de.rouhim.bts.beatport;
 
-import de.rouhim.bts.domain.BeatportPlaylist;
-import de.rouhim.bts.domain.BeatportTrack;
 import org.apache.commons.io.IOUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;

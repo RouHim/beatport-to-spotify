@@ -1,11 +1,11 @@
-package de.rouhim.bts.utils;
+package de.rouhim.bts.spotify;
 
-import de.rouhim.bts.domain.BeatportTrack;
+import de.rouhim.bts.beatport.BeatportTrack;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class QueryBuilder {
+public class SpotifyQueryBuilder {
     private static final List<String> keyWordsToRemove = mutateKeyWords("&amp;", "+", "=", "'", "&", "feat", "ft", "featuring", "vs", "versus");
 
     public static void main(String[] args) {

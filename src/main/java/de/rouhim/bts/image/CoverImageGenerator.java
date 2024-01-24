@@ -1,4 +1,4 @@
-package de.rouhim.bts.imaging;
+package de.rouhim.bts.image;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -10,7 +10,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
+import java.net.URI;
 
 public class CoverImageGenerator {
 
@@ -30,10 +30,10 @@ public class CoverImageGenerator {
         }
     }
 
-    public static byte[] generateImage(final String imageKeywords, String textToWriteOnImage) throws IOException {
-        BufferedImage image = ImageIO.read(new URL("https://source.unsplash.com/collection/9535011/500x500"));
+    public static byte[] generateImage(String textToWriteOnImage) throws IOException {
+        BufferedImage image = ImageIO.read(URI.create("https://source.unsplash.com/collection/9535011/500x500").toURL());
         Color avgColor = getAverageColorOfImage(image);
-        Color fontColor = determineFontColor(image, avgColor);
+        Color fontColor = determineFontColor(avgColor);
         drawText(image, textToWriteOnImage, fontColor);
         drawBorder(image, avgColor);
         return compress(image);
@@ -59,20 +59,20 @@ public class CoverImageGenerator {
         Graphics2D g = (Graphics2D) image.getGraphics();
         g.setStroke(new BasicStroke(3));
         g.setColor(new Color(
-                invertColor(avgColor.getRed()),
-                invertColor(avgColor.getGreen()),
-                invertColor(avgColor.getBlue()))
+                invertChannel(avgColor.getRed()),
+                invertChannel(avgColor.getGreen()),
+                invertChannel(avgColor.getBlue()))
         );
         g.drawRect(10, 10, image.getWidth() - 20, image.getHeight() - 20);
     }
 
-    private static Color determineFontColor(BufferedImage image, Color avgColor) {
+    private static Color determineFontColor(Color avgColor) {
         int avgSumColor = (int) ((avgColor.getRed() + avgColor.getGreen() + avgColor.getBlue()) / 3.f);
-        int avgSumColorInverted = invertColor(avgSumColor);
+        int avgSumColorInverted = invertChannel(avgSumColor);
         return avgSumColorInverted > 128 ? Color.WHITE : Color.BLACK;
     }
 
-    private static int invertColor(int color) {
+    private static int invertChannel(int color) {
         return (color * -1) + 255;
     }
 

@@ -1,4 +1,4 @@
-package de.rouhim.bts.utils;
+package de.rouhim.bts.spotify;
 
 import org.apache.commons.io.FileUtils;
 

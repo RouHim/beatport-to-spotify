@@ -1,10 +1,10 @@
 package de.rouhim.bts;
 
 import de.rouhim.bts.beatport.BeatPortService;
-import de.rouhim.bts.domain.BeatportPlaylist;
+import de.rouhim.bts.beatport.BeatportPlaylist;
+import de.rouhim.bts.settings.Settings;
 import de.rouhim.bts.spotify.SpotifyService;
-import de.rouhim.bts.utils.Settings;
-import de.rouhim.bts.utils.SpotifyTrackCache;
+import de.rouhim.bts.spotify.SpotifyTrackCache;
 
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
