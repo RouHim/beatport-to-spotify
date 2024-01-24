@@ -16,8 +16,8 @@ public class SpotifyQueryBuilder {
 
     public static String build(BeatportTrack beatportTrack) {
         String primaryTitle = beatportTrack.title();
-        String firstArtist = beatportTrack.artists().getFirst();
-        return optimizeQuery(String.format("%s %s", primaryTitle, firstArtist));
+        String artists = String.join(" ", beatportTrack.artists());
+        return optimizeQuery(String.format("%s %s", artists, primaryTitle));
     }
 
     private static String optimizeQuery(String query) {

@@ -63,7 +63,9 @@ public class Settings {
         ACCESS_TOKEN,
         BEATPORT_URLS,
         SCHEDULE_RATE_MINUTES,
-        GENERATE_COVER_IMAGE
+        GENERATE_COVER_IMAGE,
+        SPOTIFY_CLIENT_ID,
+        SPOTIFY_CLIENT_SECRET
     }
 
     public enum PersistentValue {
