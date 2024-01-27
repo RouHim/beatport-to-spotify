@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SpotifyQueryBuilder {
-    private static final List<String> keyWordsToRemove = mutateKeyWords("&amp;", "+", "=", "'", "&", "feat", "ft", "featuring", "vs", "versus");
+    private static final List<String> keyWordsToRemove = mutateKeyWords("&amp;", "+", "=", "'", "&");
 
     public static void main(String[] args) {
         System.out.println(optimizeQuery("Love Is Gone (feat. Dylan Matthew)"));
@@ -21,7 +21,7 @@ public class SpotifyQueryBuilder {
     }
 
     private static String optimizeQuery(String query) {
-        return removeKeyWords(removeBrackets(query));
+        return removeKeyWords(query);
     }
 
     public static String removeBetween(String text, String start, String end) {

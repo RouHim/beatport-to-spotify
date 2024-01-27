@@ -1,52 +1,47 @@
 package de.rouhim.bts;
 
-import de.rouhim.bts.beatport.BeatPortService;
-import de.rouhim.bts.beatport.BeatportPlaylist;
-import de.rouhim.bts.settings.Settings;
+import de.rouhim.bts.beatport.BeatportService;
+import de.rouhim.bts.image.CoverImageGeneratorService;
+import de.rouhim.bts.scheduler.SchedulerService;
 import de.rouhim.bts.spotify.SpotifyService;
-import de.rouhim.bts.spotify.SpotifyTrackCache;
+import org.eclipse.paho.client.mqttv3.IMqttClient;
+import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import redis.clients.jedis.Jedis;
 
-import java.time.LocalTime;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 
 public class Main {
 
-    public static void main(String[] args) {
-        int period = Settings.readInt(Settings.EnvValue.SCHEDULE_RATE_MINUTES);
-        System.out.printf(" * Schedule period: %dm%n", period);
-        Executors.newSingleThreadScheduledExecutor()
-                .scheduleAtFixedRate(Main::startCycle,
-                        0, period, TimeUnit.MINUTES);
+    public static void main(String[] args) throws MqttException {
+        // Create jedis client
+
+        try (IMqttClient mqttClient = new MqttClient("tcp://localhost:1883", MqttAsyncClient.generateClientId());
+             Jedis jedis = new Jedis("localhost", 6379)) {
+            mqttClient.connect(getMqttConnectOptions());
+
+            SchedulerService schedulerService = new SchedulerService(mqttClient);
+            BeatportService beatportService = new BeatportService(mqttClient);
+            SpotifyService spotifyService = new SpotifyService(mqttClient, jedis);
+            CoverImageGeneratorService coverImageGeneratorService = new CoverImageGeneratorService(mqttClient);
+
+            // Hold the main thread open, until gracefully terminated
+            while (true) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ignored) {
+                }
+            }
+        }
     }
 
-    private static void startCycle() {
-        try {
-            System.out.println("==============");
-            LocalTime start = LocalTime.now();
-            System.out.println("started cycle @ " + start);
-
-            List<String> beatportUrls = Settings.readStringList(Settings.EnvValue.BEATPORT_URLS);
-            System.out.printf("Found %s urls%n", beatportUrls.size());
-            BeatPortService beatPortService = new BeatPortService();
-            List<BeatportPlaylist> beatportPlaylists = beatPortService.parse(beatportUrls);
-
-
-            SpotifyService spotifyService = new SpotifyService();
-            spotifyService.initialize();
-            spotifyService.save(beatportPlaylists);
-
-            SpotifyTrackCache.persistCache();
-
-            LocalTime end = LocalTime.now();
-            long runtime = start.until(end, ChronoUnit.SECONDS);
-            System.out.printf("finished cycle @ %s - runtime: %ss%n", end, runtime);
-            System.out.println("==============");
-            System.out.println();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    private static MqttConnectOptions getMqttConnectOptions() {
+        MqttConnectOptions options = new MqttConnectOptions();
+        options.setAutomaticReconnect(true); // reconnect on connection loss
+        options.setCleanSession(true); // non-durable subscriptions
+        options.setConnectionTimeout(10);
+        return options;
     }
 }

@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+
+  mqtt:
+    image: eclipse-mosquitto
+    restart: always
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    ports:
+      - "1883:1883"
+
+  cache:
+    image: redis:alpine
+    restart: always
+    ports:
+      - "6379:6379"

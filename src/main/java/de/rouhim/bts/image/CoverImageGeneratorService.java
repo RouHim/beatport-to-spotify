@@ -1,5 +1,16 @@
 package de.rouhim.bts.image;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonObject;
+import de.rouhim.bts.settings.Settings;
+import de.rouhim.bts.spotify.SpotifyService;
+import org.apache.hc.client5.http.utils.Base64;
+import org.eclipse.paho.client.mqttv3.IMqttClient;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.pmw.tinylog.Logger;
+
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -11,23 +22,67 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
-public class CoverImageGenerator {
+public class CoverImageGeneratorService {
 
     private static final String FONT_FILE = "/Montserrat-Regular.ttf";
     private static final String FONT_NAME = "Montserrat Regular";
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+    public static final String coverImageGenerated = "coverImageGenerated";
 
     static {
         try {
-            InputStream fontDataStream = CoverImageGenerator.class.getResourceAsStream(FONT_FILE);
+            InputStream fontDataStream = CoverImageGeneratorService.class.getResourceAsStream(FONT_FILE);
 
             GraphicsEnvironment
                     .getLocalGraphicsEnvironment()
                     .registerFont(Font.createFont(Font.TRUETYPE_FONT, fontDataStream)
                             .deriveFont(48f));
         } catch (Exception e) {
-            e.printStackTrace();
+            Logger.error(e, e.getMessage());
         }
+    }
+
+    public CoverImageGeneratorService(IMqttClient mqttClient) {
+        try {
+            mqttClient.subscribe(SpotifyService.spotifyPlaylistCreated, (topic, msg) -> {
+                if (Settings.readBool(Settings.EnvValue.GENERATE_COVER_IMAGE)) {
+                    return;
+                }
+
+                JsonObject beatportPlaylist = objectMapper.readValue(msg.getPayload(), JsonObject.class);
+                String playlistId = beatportPlaylist.get("playlistId").getAsString();
+                String playlistTitle = beatportPlaylist.get("playlistTitle").getAsString();
+
+                String base64CoverImage = generateCoverImage(playlistTitle);
+
+                sendCoverImageGeneratedMessage(mqttClient, playlistId, base64CoverImage);
+            });
+        } catch (MqttException e) {
+            Logger.error(e, e.getMessage());
+        }
+    }
+
+    private static void sendCoverImageGeneratedMessage(IMqttClient mqttClient, String playlistId, String base64CoverImage) throws JsonProcessingException, MqttException {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("playlistId", playlistId);
+        payload.addProperty("base64CoverImage", base64CoverImage);
+
+        byte[] bytes = objectMapper.writeValueAsBytes(payload);
+
+        MqttMessage msg = new MqttMessage(bytes);
+        msg.setQos(2);
+        msg.setRetained(true);
+
+        mqttClient.publish(coverImageGenerated, msg);
+    }
+
+    public String generateCoverImage(String playlistTitle) throws IOException {
+        // Base64 encoded JPEG image data, maximum payload size is 256 KB.
+        String rawPlaylistTitle = playlistTitle.replace(" - Beatport Top 100", "").trim();
+        byte[] bytes = generateImage(rawPlaylistTitle);
+        return new String(Base64.encodeBase64(bytes), StandardCharsets.UTF_8);
     }
 
     public static byte[] generateImage(String textToWriteOnImage) throws IOException {
@@ -82,7 +137,8 @@ public class CoverImageGenerator {
         long sumBlue = 0;
         double cycleCount = 0;
 
-        //just process the lower half because the is the font rendered
+        // Only use the lower quarter of the image to determine the average color
+        // Because there is where the text will be written
         int yStart = image.getHeight() - (image.getHeight() / 4);
         for (int y = yStart; y < image.getHeight(); y++) {
             for (int x = 0; x < image.getWidth(); x++) {
@@ -97,9 +153,17 @@ public class CoverImageGenerator {
         double avgRed = sumRed / cycleCount;
         double avgGreen = sumGreen / cycleCount;
         double avgBlue = sumBlue / cycleCount;
+
         return new Color((int) avgRed, (int) avgGreen, (int) avgBlue);
     }
 
+    /**
+     * Draws the given text on the given image
+     *
+     * @param image draw the text on
+     * @param text  to draw
+     * @param color of the text
+     */
     private static void drawText(BufferedImage image, String text, Color color) {
         Graphics graphics = image.getGraphics();
         int initialFontSize = 90;
