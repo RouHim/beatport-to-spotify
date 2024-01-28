@@ -54,11 +54,13 @@ public class SpotifyService {
         }
 
         try {
-            mqttClient.subscribe(BeatportService.beatportGenreParsed, (topic, msg) -> {
+            mqttClient.subscribe(BeatportService.beatportGenrePlaylistParsed, (topic, msg) -> {
+                Logger.info("Message on topic {} received", topic);
                 BeatportPlaylist beatportPlaylist = objectMapper.readValue(msg.getPayload(), BeatportPlaylist.class);
                 updatePlaylist(beatportPlaylist);
             });
             mqttClient.subscribe(CoverImageGeneratorService.coverImageGenerated, (topic, msg) -> {
+                Logger.info("Message on topic {} received", topic);
                 JsonObject jsonObject = objectMapper.readValue(msg.getPayload(), JsonObject.class);
                 String playlistId = jsonObject.get("playlistId").getAsString();
                 String base64CoverImage = jsonObject.get("base64CoverImage").getAsString();
@@ -169,11 +171,10 @@ public class SpotifyService {
 
             byte[] bytes = objectMapper.writeValueAsBytes(jsonObject);
 
-            MqttMessage msg = new MqttMessage(bytes);
-            msg.setQos(2);
-            msg.setRetained(true);
+            MqttMessage message = new MqttMessage(bytes);
+            message.setQos(1);
 
-            mqttClient.publish(spotifyPlaylistCreated, msg);
+            mqttClient.publish(spotifyPlaylistCreated, message);
         } catch (MqttException | JsonProcessingException e) {
             Logger.error(e, e.getMessage());
         }

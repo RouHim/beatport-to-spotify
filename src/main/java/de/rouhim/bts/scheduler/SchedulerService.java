@@ -15,7 +15,7 @@ public class SchedulerService {
 
     public SchedulerService(IMqttClient mqttClient) {
         int period = Settings.readInt(Settings.EnvValue.SCHEDULE_RATE_MINUTES);
-        Logger.info(" * Schedule period: %dm%n", period);
+        Logger.info(" * Schedule period: {}m", period);
         ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
         scheduledExecutorService.scheduleAtFixedRate(
                 () -> tick(mqttClient),
@@ -27,11 +27,10 @@ public class SchedulerService {
 
     private void tick(IMqttClient mqttClient) {
         try {
-            MqttMessage msg = new MqttMessage();
-            msg.setQos(2);
-            msg.setRetained(true);
+            MqttMessage message = new MqttMessage();
+            message.setQos(1);
 
-            mqttClient.publish(parsingScheduled, msg);
+            mqttClient.publish(parsingScheduled, message);
         } catch (MqttException e) {
             Logger.error(e, e.getMessage());
         }

@@ -22,10 +22,10 @@ public class Main {
              Jedis jedis = new Jedis("localhost", 6379)) {
             mqttClient.connect(getMqttConnectOptions());
 
-            SchedulerService schedulerService = new SchedulerService(mqttClient);
-            BeatportService beatportService = new BeatportService(mqttClient);
-            SpotifyService spotifyService = new SpotifyService(mqttClient, jedis);
             CoverImageGeneratorService coverImageGeneratorService = new CoverImageGeneratorService(mqttClient);
+            SpotifyService spotifyService = new SpotifyService(mqttClient, jedis);
+            BeatportService beatportService = new BeatportService(mqttClient);
+            SchedulerService schedulerService = new SchedulerService(mqttClient);
 
             // Hold the main thread open, until gracefully terminated
             while (true) {

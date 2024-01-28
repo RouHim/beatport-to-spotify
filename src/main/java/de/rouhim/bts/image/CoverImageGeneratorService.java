@@ -47,6 +47,8 @@ public class CoverImageGeneratorService {
     public CoverImageGeneratorService(IMqttClient mqttClient) {
         try {
             mqttClient.subscribe(SpotifyService.spotifyPlaylistCreated, (topic, msg) -> {
+                Logger.info("Message on topic {} received", topic);
+
                 if (Settings.readBool(Settings.EnvValue.GENERATE_COVER_IMAGE)) {
                     return;
                 }
@@ -71,11 +73,10 @@ public class CoverImageGeneratorService {
 
         byte[] bytes = objectMapper.writeValueAsBytes(payload);
 
-        MqttMessage msg = new MqttMessage(bytes);
-        msg.setQos(2);
-        msg.setRetained(true);
+        MqttMessage message = new MqttMessage(bytes);
+        message.setQos(1);
 
-        mqttClient.publish(coverImageGenerated, msg);
+        mqttClient.publish(coverImageGenerated, message);
     }
 
     public String generateCoverImage(String playlistTitle) throws IOException {
