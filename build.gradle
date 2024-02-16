@@ -1,37 +1,32 @@
 plugins {
-    id 'java'
-    id 'application'
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+	id 'java'
+	id 'org.springframework.boot' version '3.2.2'
+	id 'io.spring.dependency-management' version '1.1.4'
+	id 'org.graalvm.buildtools.native' version '0.9.28'
 }
 
 group = 'de.rouhim'
-version = '1.0.0'
-def MAIN_CLASS = 'de.rouhim.bts.Main'
+version = '0.0.1-SNAPSHOT'
 
-application {
-    mainClass = MAIN_CLASS
+java {
+	sourceCompatibility = '21'
 }
 
 repositories {
-    mavenCentral()
+	mavenCentral()
 }
 
 dependencies {
-    implementation 'org.jsoup:jsoup:1.15.3'
-    implementation 'se.michaelthelin.spotify:spotify-web-api-java:8.3.5'
-    implementation 'commons-io:commons-io:2.15.0'
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'org.springframework.kafka:spring-kafka'
+	implementation 'org.jsoup:jsoup:1.15.3'
+	implementation 'se.michaelthelin.spotify:spotify-web-api-java:8.3.5'
+	implementation 'commons-io:commons-io:2.15.0'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.kafka:spring-kafka-test'
 }
 
-// This task generates a fat/uber jar
-jar {
-    manifest {
-        attributes('Main-Class': MAIN_CLASS)
-    } from {
-        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-    }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+tasks.named('test') {
+	useJUnitPlatform()
 }
