@@ -12,16 +12,14 @@ import org.springframework.kafka.core.KafkaAdmin;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * beatport.parsing.scheduled
- * ->
- *
- */
 @Configuration
 public class KafkaTopicConfig {
     public static final String KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED = "beatport.parsing.scheduled";
     public static final String KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_URL_OBTAINED = "beatport.genre.playlist.url.obtained";
     public static final String KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED = "beatport.genre.playlist.parsed";
+    public static final String KAFKA_TOPIC_SPOTIFY_PLAYLIST_UPDATED = "spotify.playlist.updated";
+    public static final String KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED = "spotify.playlist.created";
+    public static final String KAFKA_TOPIC_COVER_IMAGE_GENERATED = "cover.image.generated";
 
     @Value(value = "${spring.kafka.bootstrap-servers}")
     private String bootstrapAddress;

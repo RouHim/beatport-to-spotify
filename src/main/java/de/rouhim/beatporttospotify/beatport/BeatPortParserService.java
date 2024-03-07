@@ -1,5 +1,7 @@
 package de.rouhim.beatporttospotify.beatport;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.rouhim.beatporttospotify.scheduler.SchedulerService;
 import org.apache.commons.io.IOUtils;
 import org.jsoup.Jsoup;
@@ -8,6 +10,7 @@ import org.jsoup.nodes.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -15,20 +18,41 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_URL_OBTAINED;
 import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED;
 
 @Service
-public class BeatPortService {
+public class BeatPortParserService {
+    private static final ObjectMapper objectMapper = new ObjectMapper();
     private final Logger logger = LoggerFactory.getLogger(SchedulerService.class);
+    private final KafkaTemplate<String, String> kafkaStringMessage;
 
-    @KafkaListener(topics = KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED)
-    public void consume() {
-        logger.info("Consumed message from topic: " + KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED);
+    public BeatPortParserService(KafkaTemplate<String, String> kafkaStringMessage) {
+        this.kafkaStringMessage = kafkaStringMessage;
     }
-
 
     private static String getTrackTitle(Element trackElement) {
         return trackElement.select("span.TracksList-style__TrackName-sc-aa5f840e-0.ktpGSg").text();
+    }
+
+    @KafkaListener(topics = KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_URL_OBTAINED)
+    public void consume(String playlistUrl) throws JsonProcessingException {
+        logger.info(
+                "Consumed message from topic: %s with url: %s"
+                        .formatted(
+                                KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_URL_OBTAINED,
+                                playlistUrl
+                        )
+        );
+
+        BeatportPlaylist beatportPlaylist = parse(playlistUrl);
+
+        // Serialize to json string
+        var beatportPlaylistJson = objectMapper.writeValueAsString(beatportPlaylist);
+
+
+        // Send message to KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED
+        kafkaStringMessage.send(KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED, beatportPlaylistJson);
     }
 
     public List<BeatportTrack> getTracks(String beatportUrl) {
@@ -64,10 +88,8 @@ public class BeatPortService {
                 .toList();
     }
 
-    public List<BeatportPlaylist> parse(List<String> beatportUrls) {
-        return beatportUrls.stream()
-                .map(url -> new BeatportPlaylist(url, getPlaylistTitle(url), getTracks(url)))
-                .toList();
+    public BeatportPlaylist parse(String playlistUrl) {
+        return new BeatportPlaylist(playlistUrl, getPlaylistTitle(playlistUrl), getTracks(playlistUrl));
     }
 
     private String getPlaylistTitle(String url) {
