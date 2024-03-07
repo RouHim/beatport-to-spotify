@@ -8,21 +8,25 @@ import de.rouhim.beatporttospotify.beatport.BeatportPlaylist;
 import de.rouhim.beatporttospotify.beatport.BeatportTrack;
 import de.rouhim.beatporttospotify.config.Settings;
 import de.rouhim.beatporttospotify.scheduler.SchedulerService;
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.PostConstruct;
 import org.apache.hc.client5.http.utils.Base64;
 import org.apache.hc.core5.http.ParseException;
 import org.jsoup.internal.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
-import redis.clients.jedis.Jedis;
 import se.michaelthelin.spotify.SpotifyApi;
 import se.michaelthelin.spotify.SpotifyHttpManager;
 import se.michaelthelin.spotify.exceptions.SpotifyWebApiException;
 import se.michaelthelin.spotify.model_objects.credentials.AuthorizationCodeCredentials;
 import se.michaelthelin.spotify.model_objects.specification.Playlist;
 import se.michaelthelin.spotify.model_objects.specification.PlaylistSimplified;
+import se.michaelthelin.spotify.model_objects.specification.Track;
 
 import java.io.IOException;
 import java.net.URI;
@@ -36,16 +40,24 @@ public class SpotifyService {
     private static final String clientId = Settings.readString(Settings.EnvValue.SPOTIFY_CLIENT_ID);
     private static final String clientSecret = Settings.readString(Settings.EnvValue.SPOTIFY_CLIENT_SECRET);
     private static final URI redirectUri = SpotifyHttpManager.makeUri("https://example.org/");
+    public static final String CACHE_NAME_SPOTIFY_URI = "spotify-uri";
     private SpotifyApi spotifyApi;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private final Logger logger = LoggerFactory.getLogger(SchedulerService.class);
 
     private final KafkaTemplate<String, String> kafkaStringMessage;
+    private final CacheManager cacheManager;
+    private Cache spotifyUriCache;
 
-
-    public SpotifyService(KafkaTemplate<String, String> kafkaStringMessage) {
+    public SpotifyService(KafkaTemplate<String, String> kafkaStringMessage, CacheManager cacheManager) {
         this.kafkaStringMessage = kafkaStringMessage;
+        this.cacheManager = cacheManager;
+    }
+
+    @PostConstruct
+    public void init() {
+        spotifyUriCache = cacheManager.getCache(CACHE_NAME_SPOTIFY_URI);
     }
 
     @KafkaListener(topics = KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED)
@@ -172,11 +184,10 @@ public class SpotifyService {
     }
 
     private static String createPlaylistDto(String playlistId, String playlistTitle) throws JsonProcessingException {
-        String playlistDtoJson = objectMapper.writeValueAsString(new SpotifyPlaylistDto(
+        return objectMapper.writeValueAsString(new SpotifyPlaylistDto(
                 playlistId,
                 playlistTitle.replace(" - Beatport Top 100", "").trim()
         ));
-        return playlistDtoJson;
     }
 
     private Optional<String> createPlaylist(String playlistTitle, String sourceUrl) throws IOException, SpotifyWebApiException, ParseException {
@@ -228,7 +239,7 @@ public class SpotifyService {
             );
 
             // Read from redis cache if available
-            Optional<String> maybeCachedSpotifyUri =
+            Optional<String> maybeCachedSpotifyUri = getMaybeCachedSpotifyUri(searchQuery);
 
             if (maybeCachedSpotifyUri.isPresent()) {
                 spotifyUris.add(maybeCachedSpotifyUri.get());
@@ -237,7 +248,7 @@ public class SpotifyService {
                 if (maybeMatchedSpotifyUri.isPresent()) {
                     String matchedSpotifyUri = maybeMatchedSpotifyUri.get().getUri();
                     spotifyUris.add(matchedSpotifyUri);
-                    SpotifyTrackCache.put(searchQuery, matchedSpotifyUri);
+                    putSpotifyUriToCache(searchQuery, matchedSpotifyUri);
                 }
             }
         }
@@ -250,37 +261,40 @@ public class SpotifyService {
         logger.info("Added " + spotifyUris.size() + " tracks to spotify playlist.");
     }
 
-    private Optional<Track> matchSpotifyTrack(String searchQuery) {
+    @SuppressWarnings("DataFlowIssue")
+    private void putSpotifyUriToCache(String searchQuery, String matchedSpotifyUri) {
+        spotifyUriCache.put(searchQuery, matchedSpotifyUri);
+    }
+
+    @SuppressWarnings("DataFlowIssue")
+    private Optional<String> getMaybeCachedSpotifyUri(@Nonnull String searchQuery) {
+        String value = spotifyUriCache.get(searchQuery, String.class);
+        return Optional.ofNullable(value);
+    }
+
+    private Optional<Track> matchSpotifyTrack(String searchQuery) throws IOException, ParseException, SpotifyWebApiException {
         Optional<Track> matched = Optional.empty();
 
-        try {
-            Track[] spotifyTracks = spotifyApi.searchTracks(searchQuery).build().execute().getItems();
+        Track[] spotifyTracks = spotifyApi.searchTracks(searchQuery).build().execute().getItems();
 
-            if (spotifyTracks.length > 0) {
-                matched = Optional.of(spotifyTracks[0]);
-            } else {
-                logger.info("no match for: " + searchQuery);
-            }
-
-        } catch (IOException | SpotifyWebApiException e) {
-            e.printStackTrace();
-        } catch (ParseException e) {
-            throw new RuntimeException(e);
+        if (spotifyTracks.length > 0) {
+            matched = Optional.of(spotifyTracks[0]);
+        } else {
+            logger.info("no match for: " + searchQuery);
         }
 
         return matched;
     }
 
-    public void save(List<BeatportPlaylist> beatportPlaylists) {
+    public void save(List<BeatportPlaylist> beatportPlaylists) throws Exception {
         for (BeatportPlaylist beatportPlaylist : beatportPlaylists) {
+            updatePlaylist(beatportPlaylist);
+
             try {
-
-                updatePlaylist(beatportPlaylist);
-
                 logger.info("finished parsing\n");
                 Thread.sleep(1000);
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
         }
     }
