@@ -1,5 +1,6 @@
 package de.rouhim.beatporttospotify.scheduler;
 
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -18,10 +19,14 @@ public class SchedulerService {
         this.kafkaStringMessage = kafkaStringMessage;
     }
 
-    @Scheduled(fixedRate = 60000)
-    public void runNightlyTask() {
+    @PostConstruct
+    public void init() {
+        runTask();
+    }
+
+    @Scheduled(cron = "0 0 0 * * *")
+    public void runTask() {
         logger.info("Sending beatport parsing scheduled message");
         kafkaStringMessage.send(KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED, null);
     }
-
 }
