@@ -24,6 +24,7 @@ import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_BE
 @Service
 public class BeatPortParserService {
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    public static final String SUFFIX_BEATPORT_TOP_100 = " - Beatport Top 100";
     private final Logger logger = LoggerFactory.getLogger(SchedulerService.class);
     private final KafkaTemplate<String, String> kafkaStringMessage;
 
@@ -82,7 +83,7 @@ public class BeatPortParserService {
     }
 
     private List<String> toTrackArtists(Element trackElement) {
-        return trackElement.select("div.ArtistNames-sc-dff2fb58-0.demTCQ a")
+        return trackElement.select("div[class^=ArtistNames a")
                 .stream()
                 .map(Element::text)
                 .toList();
@@ -96,8 +97,8 @@ public class BeatPortParserService {
         try {
             URI beatportUri = URI.create(url);
             Document doc = Jsoup.parse(IOUtils.toString(beatportUri, StandardCharsets.UTF_8));
-            Element titleElement = doc.select("div.TitleControls-style__PreText-sc-80310707-1.dHuTUq").first();
-            return titleElement.text() + " - Beatport Top 100";
+            Element titleElement = doc.select("div[class^=TitleControls-style__PreText]").first();
+            return titleElement.text().trim() + SUFFIX_BEATPORT_TOP_100;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
