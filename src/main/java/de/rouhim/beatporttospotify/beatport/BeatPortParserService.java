@@ -18,8 +18,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED;
 import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_URL_OBTAINED;
-import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED;
 
 @Service
 public class BeatPortParserService {
@@ -30,10 +30,6 @@ public class BeatPortParserService {
 
     public BeatPortParserService(KafkaTemplate<String, String> kafkaStringMessage) {
         this.kafkaStringMessage = kafkaStringMessage;
-    }
-
-    private static String getTrackTitle(Element trackElement) {
-        return trackElement.select("span.TracksList-style__TrackName-sc-aa5f840e-0.ktpGSg").text();
     }
 
     @KafkaListener(topics = KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_URL_OBTAINED)
@@ -53,7 +49,7 @@ public class BeatPortParserService {
 
 
         // Send message to KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED
-        kafkaStringMessage.send(KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED, beatportPlaylistJson);
+        kafkaStringMessage.send(KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED, beatportPlaylistJson);
     }
 
     public List<BeatportTrack> getTracks(String beatportUrl) {
@@ -65,7 +61,7 @@ public class BeatPortParserService {
 
             // Select div with the following tag: data-testid="tracks-list-item"
             List<BeatportTrack> beatportTracks = doc
-                    .select("div[data-testid=tracks-list-item]")
+                    .select("div[data-testid=tracks-table-row]")
                     .stream()
                     .map(this::toTrack)
                     .toList();
@@ -79,25 +75,36 @@ public class BeatPortParserService {
     }
 
     private BeatportTrack toTrack(Element trackElement) {
-        return new BeatportTrack(toTrackArtists(trackElement), getTrackTitle(trackElement));
+        return new BeatportTrack(
+                toTrackArtists(trackElement),
+                getTrackTitle(trackElement)
+        );
     }
 
     private List<String> toTrackArtists(Element trackElement) {
-        return trackElement.select("div[class^=ArtistNames a")
+        return trackElement.select("div[class^=ArtistNames] a")
                 .stream()
                 .map(Element::text)
                 .toList();
     }
 
     public BeatportPlaylist parse(String playlistUrl) {
-        return new BeatportPlaylist(playlistUrl, getPlaylistTitle(playlistUrl), getTracks(playlistUrl));
+        return new BeatportPlaylist(
+                playlistUrl,
+                getPlaylistTitle(playlistUrl),
+                getTracks(playlistUrl)
+        );
+    }
+
+    private static String getTrackTitle(Element trackElement) {
+        return trackElement.select("span[class^=TracksTable]").text();
     }
 
     private String getPlaylistTitle(String url) {
         try {
             URI beatportUri = URI.create(url);
             Document doc = Jsoup.parse(IOUtils.toString(beatportUri, StandardCharsets.UTF_8));
-            Element titleElement = doc.select("div[class^=TitleControls-style__PreText]").first();
+            Element titleElement = doc.select("div[class^=TitleControls]").last();
             return titleElement.text().trim() + SUFFIX_BEATPORT_TOP_100;
         } catch (IOException e) {
             throw new RuntimeException(e);

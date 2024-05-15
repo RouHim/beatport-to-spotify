@@ -31,9 +31,17 @@ import se.michaelthelin.spotify.model_objects.specification.Track;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Scanner;
 
-import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.*;
+import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED;
+import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_COVER_IMAGE_GENERATED;
+import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED;
+import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_SPOTIFY_PLAYLIST_UPDATED;
 
 @Service
 public class SpotifyService {
@@ -56,8 +64,9 @@ public class SpotifyService {
     }
 
     @PostConstruct
-    public void init() {
+    public void init() throws IOException, ParseException, SpotifyWebApiException {
         spotifyUriCache = cacheManager.getCache(CACHE_NAME_SPOTIFY_URI);
+        initialize();
     }
 
     @KafkaListener(topics = KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED)
@@ -111,8 +120,7 @@ public class SpotifyService {
                 authorizeApi();
             } else {
                 spotifyApi.setAccessToken(accessToken);
-                spotifyApi.setRefreshToken(refreshToken);
-                refreshToken();
+                spotifyApi.setRefreshToken(refreshToken());
             }
         }
     }
@@ -138,12 +146,12 @@ public class SpotifyService {
         //logger.info("Expires in: " + authorizationCodeCredentials.getExpiresIn());
     }
 
-    private void refreshToken() throws IOException, SpotifyWebApiException, ParseException {
-        AuthorizationCodeCredentials authorizationRefreshCodeCredentials = spotifyApi.authorizationCodeRefresh().build().execute();
-        spotifyApi.setAccessToken(authorizationRefreshCodeCredentials.getAccessToken());
-        spotifyApi.setRefreshToken(authorizationRefreshCodeCredentials.getRefreshToken());
+    private String refreshToken() throws IOException, SpotifyWebApiException, ParseException {
+        AuthorizationCodeCredentials authorizationRefreshCodeCredentials = spotifyApi.authorizationCodeRefresh()
+                .build()
+                .execute();
 
-        //logger.info("Expires in: " + authorizationRefreshCodeCredentials.getExpiresIn());
+        return authorizationRefreshCodeCredentials.getRefreshToken();
     }
 
     public void updatePlaylist(BeatportPlaylist beatportPlaylist) throws Exception {
