@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.rouhim.beatporttospotify.spotify.SpotifyPlaylistDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.util.Pair;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -56,10 +55,11 @@ public class CoverImageService {
 
         byte[] coverImage = generateImage(spotifyPlaylist.title());
 
-        Pair<String, byte[]> coverImagePair = Pair.of(spotifyPlaylist.id(), coverImage);
-
         // Send KAFKA_TOPIC_COVER_IMAGE_GENERATED message
-        kafkaStringMessage.send(KAFKA_TOPIC_COVER_IMAGE_GENERATED, objectMapper.writeValueAsString(coverImagePair));
+        String messagePayload = objectMapper.writeValueAsString(
+                new CoverImage(spotifyPlaylist.id(), coverImage)
+        );
+        kafkaStringMessage.send(KAFKA_TOPIC_COVER_IMAGE_GENERATED, messagePayload);
     }
 
     public CoverImageService(KafkaTemplate<String, String> kafkaStringMessage) {

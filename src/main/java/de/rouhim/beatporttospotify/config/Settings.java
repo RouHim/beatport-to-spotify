@@ -59,6 +59,20 @@ public class Settings {
         return Arrays.asList(value.split(","));
     }
 
+    /**
+     * Deletes the persistent value
+     */
+    public static void deletePersistentValue(PersistentValue persistentValue) {
+        try {
+            File dataDir = new File("./data");
+            dataDir.mkdirs();
+            File file = new File(dataDir, persistentValue.name());
+            file.delete();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public enum EnvValue {
         ACCESS_TOKEN,
         BEATPORT_URLS,

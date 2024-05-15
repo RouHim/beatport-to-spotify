@@ -7,7 +7,7 @@ import com.google.gson.JsonObject;
 import de.rouhim.beatporttospotify.beatport.BeatportPlaylist;
 import de.rouhim.beatporttospotify.beatport.BeatportTrack;
 import de.rouhim.beatporttospotify.config.Settings;
-import de.rouhim.beatporttospotify.scheduler.SchedulerService;
+import de.rouhim.beatporttospotify.image.CoverImage;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.PostConstruct;
 import org.apache.hc.client5.http.utils.Base64;
@@ -34,9 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Scanner;
 
 import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED;
 import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_COVER_IMAGE_GENERATED;
@@ -52,7 +50,7 @@ public class SpotifyService {
     private SpotifyApi spotifyApi;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private final Logger logger = LoggerFactory.getLogger(SchedulerService.class);
+    private final Logger logger = LoggerFactory.getLogger(SpotifyService.class);
 
     private final KafkaTemplate<String, String> kafkaStringMessage;
     private final CacheManager cacheManager;
@@ -88,53 +86,58 @@ public class SpotifyService {
     public void consumeCoverImageGenerated(String coverImagePairJson) throws IOException, SpotifyWebApiException, ParseException {
         logger.info("Consumed message from topic: " + KAFKA_TOPIC_COVER_IMAGE_GENERATED);
 
-        var coverImagePair = objectMapper.readValue(coverImagePairJson, Map.Entry.class);
-        String playlistId = (String) coverImagePair.getKey();
-        byte[] coverImage = (byte[]) coverImagePair.getValue();
+        var coverImagePair = objectMapper.readValue(coverImagePairJson, CoverImage.class);
+        String playlistId = coverImagePair.identifier();
+        byte[] coverImage = coverImagePair.imageData();
 
         // Base64 encoded JPEG image data, maximum payload size is 256 KB.
-        String encodedImage = new String(Base64.encodeBase64(coverImage), StandardCharsets.UTF_8);
+        // FIXME: This fails
+        String encodedImage = Base64.encodeBase64String(coverImage);
         spotifyApi.uploadCustomPlaylistCoverImage(playlistId)
                 .image_data(encodedImage)
                 .build().execute();
     }
 
-    public String readInput(String enterMessage) {
-        Scanner scanner = new Scanner(System.in);
-        logger.info(enterMessage);
-        return scanner.next();
-    }
-
     public void initialize() throws IOException, SpotifyWebApiException, ParseException {
-        if (spotifyApi == null) {
-            spotifyApi = new SpotifyApi.Builder()
-                    .setClientId(clientId)
-                    .setClientSecret(clientSecret)
-                    .setRedirectUri(redirectUri)
-                    .build();
+        if (spotifyApi != null) {
+            return;
+        }
 
-            String accessToken = Settings.readString(Settings.EnvValue.ACCESS_TOKEN);
-            String refreshToken = Settings.readPersistentValue(Settings.PersistentValue.REFRESH_TOKEN);
+        spotifyApi = new SpotifyApi.Builder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRedirectUri(redirectUri)
+                .build();
 
-            if (StringUtil.isBlank(accessToken) || StringUtil.isBlank(refreshToken)) {
-                authorizeApi();
-            } else {
-                spotifyApi.setAccessToken(accessToken);
-                spotifyApi.setRefreshToken(refreshToken());
+        String accessToken = Settings.readString(Settings.EnvValue.ACCESS_TOKEN);
+        String refreshToken = Settings.readPersistentValue(Settings.PersistentValue.REFRESH_TOKEN);
+
+        if (StringUtil.isBlank(accessToken)) {
+            logger.info("No access token found, requesting manual authorization");
+            requestManualAuthorization();
+        } else if (!StringUtil.isBlank(accessToken) && StringUtil.isBlank(refreshToken)) {
+            try {
+                logger.info("Requesting refresh token");
+                requestRefreshToken(accessToken);
+            } catch (IOException | SpotifyWebApiException | ParseException e) {
+                // If this fails, the access token is invalid, request a new one
+                logger.error("Could not refresh token, requesting manual authorization: {}", e.getMessage(), e);
+                requestManualAuthorization();
             }
+        }
+
+        try {
+            logger.info("Testing access token validity");
+            spotifyApi.getCurrentUsersProfile().build().execute();
+        } catch (SpotifyWebApiException e) {
+            // If this fails, the access token is invalid, request a new one
+            requestManualAuthorization();
         }
     }
 
-    private void authorizeApi() throws IOException, SpotifyWebApiException, ParseException {
-        URI authUrl = spotifyApi.authorizationCodeUri()
-                .scope("playlist-modify-public playlist-modify-private ugc-image-upload")
-                .build().execute();
-
-        logger.info("Visit: " + authUrl.toString());
-
-        String code = readInput("Enter code:");
-
-        AuthorizationCodeCredentials authorizationCodeCredentials = spotifyApi.authorizationCode(code)
+    private void requestRefreshToken(String accessToken) throws IOException, SpotifyWebApiException, ParseException {
+        AuthorizationCodeCredentials authorizationCodeCredentials = spotifyApi
+                .authorizationCode(accessToken)
                 .build().execute();
 
         // Set access and refresh token for further "spotifyApi" object usage
@@ -142,27 +145,33 @@ public class SpotifyService {
         spotifyApi.setRefreshToken(authorizationCodeCredentials.getRefreshToken());
 
         Settings.savePersistentValue(Settings.PersistentValue.REFRESH_TOKEN, authorizationCodeCredentials.getRefreshToken());
-
-        //logger.info("Expires in: " + authorizationCodeCredentials.getExpiresIn());
     }
 
-    private String refreshToken() throws IOException, SpotifyWebApiException, ParseException {
-        AuthorizationCodeCredentials authorizationRefreshCodeCredentials = spotifyApi.authorizationCodeRefresh()
-                .build()
-                .execute();
+    private void requestManualAuthorization() throws IOException, SpotifyWebApiException, ParseException {
+        logger.info("Requesting manual authorization");
 
-        return authorizationRefreshCodeCredentials.getRefreshToken();
+        URI authUrl = spotifyApi.authorizationCodeUri()
+                .scope("playlist-modify-public playlist-modify-private ugc-image-upload")
+                .build().execute();
+
+        logger.info("Visit: {}", authUrl.toString());
+        logger.info("Then enter the retrieved code to ACCESS_TOKEN and restart");
+
+        // Invalidate refresh token
+        Settings.deletePersistentValue(Settings.PersistentValue.REFRESH_TOKEN);
+
+        System.exit(0);
     }
 
     public void updatePlaylist(BeatportPlaylist beatportPlaylist) throws Exception {
         String playlistTitle = beatportPlaylist.title();
         String sourceUrl = beatportPlaylist.url();
 
-        logger.info("Try to find playlist: " + playlistTitle);
+        logger.info("Try to find playlist: {}", playlistTitle);
         Optional<String> playlistId = findPlaylist(playlistTitle);
 
         if (playlistId.isEmpty()) {
-            logger.info("No playlist found, creating:" + sourceUrl);
+            logger.info("No playlist found, creating:{}", sourceUrl);
             playlistId = createPlaylist(playlistTitle, sourceUrl);
 
 
@@ -187,7 +196,7 @@ public class SpotifyService {
             String playlistDtoJson = createPlaylistDto(playlist.getId(), playlistTitle);
             kafkaStringMessage.send(KAFKA_TOPIC_SPOTIFY_PLAYLIST_UPDATED, playlistDtoJson);
         } else {
-            logger.error("Could not create a playlist for: " + sourceUrl);
+            logger.error("Could not create a playlist for: {}", sourceUrl);
         }
     }
 
@@ -266,7 +275,7 @@ public class SpotifyService {
 
         spotifyApi.addItemsToPlaylist(playlist.getId(), itemsToAdd).build().execute();
 
-        logger.info("Added " + spotifyUris.size() + " tracks to spotify playlist.");
+        logger.info("Added {} tracks to spotify playlist.", spotifyUris.size());
     }
 
     @SuppressWarnings("DataFlowIssue")
@@ -288,7 +297,7 @@ public class SpotifyService {
         if (spotifyTracks.length > 0) {
             matched = Optional.of(spotifyTracks[0]);
         } else {
-            logger.info("no match for: " + searchQuery);
+            logger.info("no match for: {}", searchQuery);
         }
 
         return matched;
