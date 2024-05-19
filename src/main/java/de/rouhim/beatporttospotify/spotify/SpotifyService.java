@@ -30,7 +30,6 @@ import se.michaelthelin.spotify.model_objects.specification.Track;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -119,7 +118,7 @@ public class SpotifyService {
             try {
                 logger.info("Requesting refresh token");
                 requestRefreshToken(accessToken);
-            } catch (IOException | SpotifyWebApiException | ParseException e) {
+            } catch (Exception e) {
                 // If this fails, the access token is invalid, request a new one
                 logger.error("Could not refresh token, requesting manual authorization: {}", e.getMessage(), e);
                 requestManualAuthorization();
@@ -130,7 +129,7 @@ public class SpotifyService {
             logger.info("Testing access token validity");
             spotifyApi.getCurrentUsersProfile().build().execute();
         } catch (SpotifyWebApiException e) {
-            // If this fails, the access token is invalid, request a new one
+            logger.error(e.getMessage(), e);
             requestManualAuthorization();
         }
     }
@@ -138,7 +137,8 @@ public class SpotifyService {
     private void requestRefreshToken(String accessToken) throws IOException, SpotifyWebApiException, ParseException {
         AuthorizationCodeCredentials authorizationCodeCredentials = spotifyApi
                 .authorizationCode(accessToken)
-                .build().execute();
+                .build()
+                .execute();
 
         // Set access and refresh token for further "spotifyApi" object usage
         spotifyApi.setAccessToken(authorizationCodeCredentials.getAccessToken());
