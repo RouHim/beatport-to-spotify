@@ -131,12 +131,15 @@ public class SpotifyService {
     private void requestAccessToken(String authCode) throws IOException, SpotifyWebApiException, ParseException {
         AuthorizationCodeCredentials authorizationCodeCredentials = spotifyApi.authorizationCode(authCode).build().execute();
 
+        String accessToken = authorizationCodeCredentials.getAccessToken();
+        String refreshToken = authorizationCodeCredentials.getRefreshToken();
+
         // Set access and refresh token for further "spotifyApi" object usage
-        spotifyApi.setAccessToken(authorizationCodeCredentials.getAccessToken());
+        spotifyApi.setAccessToken(accessToken);
         spotifyApi.setRefreshToken(authorizationCodeCredentials.getRefreshToken());
 
-        Settings.savePersistentValue(Settings.PersistentValue.ACCESS_TOKEN, authorizationCodeCredentials.getAccessToken());
-        Settings.savePersistentValue(Settings.PersistentValue.REFRESH_TOKEN, authorizationCodeCredentials.getRefreshToken());
+        Settings.savePersistentValue(Settings.PersistentValue.ACCESS_TOKEN, accessToken);
+        Settings.savePersistentValue(Settings.PersistentValue.REFRESH_TOKEN, refreshToken);
     }
 
     private void requestRefreshToken(String accessToken, String refreshToken) throws IOException, SpotifyWebApiException, ParseException {
