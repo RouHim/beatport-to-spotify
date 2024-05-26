@@ -1,0 +1,9 @@
+spring:
+  kafka:
+    consumer:
+      bootstrap-servers: localhost:9092
+      auto-offset-reset: earliest
+      group-id: my-group
+      properties:
+        enable.auto.commit: true
+        auto.commit.interval.ms: 10000 # Commit every 10 seconds

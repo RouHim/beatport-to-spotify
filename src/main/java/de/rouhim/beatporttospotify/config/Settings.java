@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 public class Settings {
 
@@ -22,15 +23,15 @@ public class Settings {
     }
 
     // Reads data from file
-    public static String readPersistentValue(PersistentValue key) {
+    public static Optional<String> readPersistentValue(PersistentValue key) {
         try {
             File dataDir = new File("./data");
             dataDir.mkdirs();
             File file = new File(dataDir, key.name());
             if (!file.exists()) {
-                return "";
+                return Optional.empty();
             }
-            return FileUtils.readFileToString(file, "UTF-8");
+            return Optional.of(FileUtils.readFileToString(file, "UTF-8"));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -43,8 +44,8 @@ public class Settings {
     }
 
     // Reads the given env value as a String
-    public static String readString(EnvValue envValue) {
-        return System.getenv(envValue.name());
+    public static Optional<String> readString(EnvValue envValue) {
+        return Optional.ofNullable(System.getenv(envValue.name()));
     }
 
     // Reads the given env value as a bool
@@ -74,7 +75,7 @@ public class Settings {
     }
 
     public enum EnvValue {
-        ACCESS_TOKEN,
+        SPOTIFY_AUTH_CODE,
         BEATPORT_URLS,
         SCHEDULE_RATE_MINUTES,
         GENERATE_COVER_IMAGE,
@@ -83,6 +84,7 @@ public class Settings {
     }
 
     public enum PersistentValue {
+        ACCESS_TOKEN,
         REFRESH_TOKEN,
     }
 }
