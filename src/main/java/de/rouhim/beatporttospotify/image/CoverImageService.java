@@ -110,7 +110,7 @@ public class CoverImageService {
 
             HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
 
-            // FIXME: if that faily generate an image: https://dev.dezgo.com/
+            // FIXME: if that faily generate an image: https://stablehorde.net/
 
             // Verify response status code
             int statusCode = response.statusCode();
