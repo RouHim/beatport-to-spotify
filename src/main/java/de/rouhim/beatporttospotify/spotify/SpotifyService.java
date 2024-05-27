@@ -136,7 +136,7 @@ public class SpotifyService {
 
         // Set access and refresh token for further "spotifyApi" object usage
         spotifyApi.setAccessToken(accessToken);
-        spotifyApi.setRefreshToken(authorizationCodeCredentials.getRefreshToken());
+        spotifyApi.setRefreshToken(refreshToken);
 
         Settings.savePersistentValue(Settings.PersistentValue.ACCESS_TOKEN, accessToken);
         Settings.savePersistentValue(Settings.PersistentValue.REFRESH_TOKEN, refreshToken);
@@ -167,7 +167,7 @@ public class SpotifyService {
                 .build().execute();
 
         logger.info("Visit: {}", authUrl.toString());
-        logger.info("Then enter the retrieved code to ACCESS_TOKEN and restart");
+        logger.info("Then enter the retrieved code to SPOTIFY_AUTH_CODE and restart");
 
         System.exit(0);
     }
@@ -215,21 +215,22 @@ public class SpotifyService {
 
     private void authCodeRefresh() {
         try {
-            spotifyApi.setRefreshToken(Settings.readPersistentValue(Settings.PersistentValue.REFRESH_TOKEN).orElseThrow());
+            Optional<String> existingRefreshToken = Settings.readPersistentValue(Settings.PersistentValue.REFRESH_TOKEN);
+            if (existingRefreshToken.isEmpty()) {
+                throw new RuntimeException("No refresh token found");
+            }
+
+            spotifyApi.setRefreshToken(existingRefreshToken.get());
 
             AuthorizationCodeCredentials authorizationCodeCredentials = spotifyApi.authorizationCodeRefresh()
                     .build()
                     .execute();
 
-            // Set access and refresh token for further "spotifyApi" object usage
             String accessToken = authorizationCodeCredentials.getAccessToken();
-            String refreshToken = authorizationCodeCredentials.getRefreshToken();
 
             spotifyApi.setAccessToken(accessToken);
-            spotifyApi.setRefreshToken(refreshToken);
 
             Settings.savePersistentValue(Settings.PersistentValue.ACCESS_TOKEN, accessToken);
-            Settings.savePersistentValue(Settings.PersistentValue.REFRESH_TOKEN, refreshToken);
         } catch (IOException | SpotifyWebApiException | ParseException e) {
             logger.error("Could not refresh access token: {}", e.getMessage(), e);
         }

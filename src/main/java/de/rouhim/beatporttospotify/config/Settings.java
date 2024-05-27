@@ -1,6 +1,7 @@
 package de.rouhim.beatporttospotify.config;
 
 import org.apache.commons.io.FileUtils;
+import org.springframework.util.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,7 +32,8 @@ public class Settings {
             if (!file.exists()) {
                 return Optional.empty();
             }
-            return Optional.of(FileUtils.readFileToString(file, "UTF-8"));
+            String stringValue = FileUtils.readFileToString(file, "UTF-8");
+            return Optional.ofNullable(StringUtils.hasText(stringValue) ? stringValue : null);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
