@@ -6,7 +6,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.KafkaListeners;
+import org.springframework.kafka.annotation.RetryableTopic;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.IIOImage;
@@ -38,7 +40,6 @@ public class CoverImageService {
     private static final String FONT_NAME = "Montserrat Regular";
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final String UNSPLASH_COLLECTION_URL = "https://source.unsplash.com/collection/9535011/500x500";
-    private final KafkaTemplate<String, String> kafkaStringMessage;
 
     static {
         try {
@@ -54,23 +55,7 @@ public class CoverImageService {
         }
     }
 
-    @KafkaListeners({
-            @KafkaListener(topics = KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED),
-            @KafkaListener(topics = KAFKA_TOPIC_SPOTIFY_PLAYLIST_UPDATED)
-    })
-    public void consumePlaylistCreated(String playlistJson) throws IOException {
-        logger.info("Consumed message from topic: " + KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED);
-
-        var spotifyPlaylist = objectMapper.readValue(playlistJson, SpotifyPlaylistDto.class);
-
-        byte[] coverImage = generateImage(spotifyPlaylist.title());
-
-        String messagePayload = objectMapper.writeValueAsString(
-                new CoverImage(spotifyPlaylist.id(), coverImage)
-        );
-
-        kafkaStringMessage.send(KAFKA_TOPIC_COVER_IMAGE_GENERATED, messagePayload);
-    }
+    private final KafkaTemplate<String, String> kafkaStringMessage;
 
     public CoverImageService(KafkaTemplate<String, String> kafkaStringMessage) {
         this.kafkaStringMessage = kafkaStringMessage;
@@ -109,8 +94,6 @@ public class CoverImageService {
                     .build();
 
             HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
-
-            // FIXME: if that faily generate an image: https://stablehorde.net/
 
             // Verify response status code
             int statusCode = response.statusCode();
@@ -208,5 +191,24 @@ public class CoverImageService {
         graphics.drawString(text, x, y);
 
         graphics.dispose();
+    }
+
+    @KafkaListeners({
+            @KafkaListener(topics = KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED),
+            @KafkaListener(topics = KAFKA_TOPIC_SPOTIFY_PLAYLIST_UPDATED)
+    })
+    @RetryableTopic(attempts = "15", backoff = @Backoff(delay = 1000, multiplier = 2))
+    public void consumePlaylistCreated(String playlistJson) throws IOException {
+        logger.info("Consumed message from topic: " + KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED);
+
+        var spotifyPlaylist = objectMapper.readValue(playlistJson, SpotifyPlaylistDto.class);
+
+        byte[] coverImage = generateImage(spotifyPlaylist.title());
+
+        String messagePayload = objectMapper.writeValueAsString(
+                new CoverImage(spotifyPlaylist.id(), coverImage)
+        );
+
+        kafkaStringMessage.send(KAFKA_TOPIC_COVER_IMAGE_GENERATED, messagePayload);
     }
 }
