@@ -6,9 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.KafkaListeners;
-import org.springframework.kafka.annotation.RetryableTopic;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.IIOImage;
@@ -29,6 +27,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
+import static de.rouhim.beatporttospotify.beatport.BeatPortParserService.SUFFIX_BEATPORT_TOP_100;
 import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_COVER_IMAGE_GENERATED;
 import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED;
 import static de.rouhim.beatporttospotify.config.KafkaTopicConfig.KAFKA_TOPIC_SPOTIFY_PLAYLIST_UPDATED;
@@ -68,6 +67,10 @@ public class CoverImageService {
             byte[] imageBytes = readFromUrl(imgUrl);
             BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageBytes));
 
+            if (image == null) {
+                throw new RuntimeException("Could not read image from URL: " + imgUrl);
+            }
+
             // Write image to file
             ImageIO.write(image, "jpg", new File("image.jpg"));
 
@@ -87,9 +90,11 @@ public class CoverImageService {
     }
 
     private static byte[] readFromUrl(URI url) throws IOException {
-        try (HttpClient client = HttpClient.newHttpClient()) {
+        try (HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build()) {
+            // Follow redirects and set user agent
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(url)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.3")
                     .GET()
                     .build();
 
@@ -197,13 +202,14 @@ public class CoverImageService {
             @KafkaListener(topics = KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED),
             @KafkaListener(topics = KAFKA_TOPIC_SPOTIFY_PLAYLIST_UPDATED)
     })
-    @RetryableTopic(attempts = "15", backoff = @Backoff(delay = 1000, multiplier = 2))
     public void consumePlaylistCreated(String playlistJson) throws IOException {
         logger.info("Consumed message from topic: " + KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED);
 
         var spotifyPlaylist = objectMapper.readValue(playlistJson, SpotifyPlaylistDto.class);
 
-        byte[] coverImage = generateImage(spotifyPlaylist.title());
+        String title = spotifyPlaylist.title().replace(SUFFIX_BEATPORT_TOP_100, "");
+
+        byte[] coverImage = generateImage(title);
 
         String messagePayload = objectMapper.writeValueAsString(
                 new CoverImage(spotifyPlaylist.id(), coverImage)

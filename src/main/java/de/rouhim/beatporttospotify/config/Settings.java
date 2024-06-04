@@ -1,6 +1,8 @@
 package de.rouhim.beatporttospotify.config;
 
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 
 import java.io.File;
@@ -11,8 +13,15 @@ import java.util.Optional;
 
 public class Settings {
 
+    private static final Logger logger = LoggerFactory.getLogger(Settings.class);
+
     // Writes data to file
     public static void savePersistentValue(PersistentValue key, String value) {
+        if (!StringUtils.hasText(value)) {
+            logger.warn("Trying to save empty value for key: {}", key);
+            return;
+        }
+
         try {
             File dataDir = new File("./data");
             dataDir.mkdirs();

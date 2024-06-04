@@ -103,8 +103,14 @@ public class BeatPortParserService {
     private String getPlaylistTitle(String url) {
         try {
             URI beatportUri = URI.create(url);
-            Document doc = Jsoup.parse(IOUtils.toString(beatportUri, StandardCharsets.UTF_8));
+            String htmlData = IOUtils.toString(beatportUri, StandardCharsets.UTF_8);
+            Document doc = Jsoup.parse(htmlData);
             Element titleElement = doc.select("div[class^=TitleControls]").last();
+
+            if (titleElement == null) {
+                throw new RuntimeException("Could not find title element for url: " + url);
+            }
+
             return titleElement.text().trim() + SUFFIX_BEATPORT_TOP_100;
         } catch (IOException e) {
             throw new RuntimeException(e);

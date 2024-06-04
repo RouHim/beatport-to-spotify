@@ -34,31 +34,43 @@ public class KafkaTopicConfig {
 
     @Bean
     public NewTopic topic1() {
-        return TopicBuilder.name(KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED).build();
+        return TopicBuilder
+                .name(KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED)
+                .build();
     }
 
     @Bean
     public NewTopic topic2() {
-        return TopicBuilder.name(KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_URL_OBTAINED).build();
+        return TopicBuilder
+                .name(KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_URL_OBTAINED)
+                .build();
     }
 
     @Bean
     public NewTopic topic3() {
-        return TopicBuilder.name(KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED).build();
+        return TopicBuilder
+                .name(KAFKA_TOPIC_BEATPORT_GENRE_PLAYLIST_PARSED)
+                .build();
     }
 
     @Bean
     public NewTopic topic4() {
-        return TopicBuilder.name(KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED).build();
+        return TopicBuilder
+                .name(KAFKA_TOPIC_SPOTIFY_PLAYLIST_CREATED)
+                .build();
     }
 
     @Bean
     public NewTopic topic5() {
-        return TopicBuilder.name(KAFKA_TOPIC_SPOTIFY_PLAYLIST_UPDATED).build();
+        return TopicBuilder
+                .name(KAFKA_TOPIC_SPOTIFY_PLAYLIST_UPDATED)
+                .build();
     }
 
     @Bean
     public NewTopic topic6() {
-        return TopicBuilder.name(KAFKA_TOPIC_COVER_IMAGE_GENERATED).build();
+        return TopicBuilder
+                .name(KAFKA_TOPIC_COVER_IMAGE_GENERATED)
+                .build();
     }
 }

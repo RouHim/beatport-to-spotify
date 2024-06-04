@@ -145,14 +145,23 @@ public class SpotifyService {
     private void requestRefreshToken(String accessToken, String refreshToken) throws IOException, SpotifyWebApiException, ParseException {
         spotifyApi.setAccessToken(accessToken);
         spotifyApi.setRefreshToken(refreshToken);
+
         AuthorizationCodeCredentials authorizationCodeCredentials = spotifyApi.authorizationCodeRefresh().build().execute();
 
-        // Set access and refresh token for further "spotifyApi" object usage
-        spotifyApi.setAccessToken(authorizationCodeCredentials.getAccessToken());
-        spotifyApi.setRefreshToken(authorizationCodeCredentials.getRefreshToken());
+        String newAccessToken = authorizationCodeCredentials.getAccessToken();
+        String newRefreshToken = authorizationCodeCredentials.getRefreshToken();
 
-        Settings.savePersistentValue(Settings.PersistentValue.ACCESS_TOKEN, authorizationCodeCredentials.getAccessToken());
-        Settings.savePersistentValue(Settings.PersistentValue.REFRESH_TOKEN, authorizationCodeCredentials.getRefreshToken());
+        if (authorizationCodeCredentials.getAccessToken() == null || authorizationCodeCredentials.getRefreshToken() == null) {
+            logger.warn("Could not refresh access token");
+            return;
+        }
+
+        // Set access and refresh token for further "spotifyApi" object usage
+        spotifyApi.setAccessToken(newAccessToken);
+        spotifyApi.setRefreshToken(newRefreshToken);
+
+        Settings.savePersistentValue(Settings.PersistentValue.ACCESS_TOKEN, newAccessToken);
+        Settings.savePersistentValue(Settings.PersistentValue.REFRESH_TOKEN, newRefreshToken);
     }
 
     private void requestManualAuthorization() throws IOException, SpotifyWebApiException, ParseException {
@@ -217,7 +226,8 @@ public class SpotifyService {
         try {
             Optional<String> existingRefreshToken = Settings.readPersistentValue(Settings.PersistentValue.REFRESH_TOKEN);
             if (existingRefreshToken.isEmpty()) {
-                throw new RuntimeException("No refresh token found");
+                logger.error("No spotify refresh token found");
+                System.exit(1);
             }
 
             spotifyApi.setRefreshToken(existingRefreshToken.get());
@@ -242,10 +252,9 @@ public class SpotifyService {
             logger.info("Valid cover image found for playlist: {}", playlistTitle);
         } else {
             logger.info("No valid cover image found for playlist: {}", playlistTitle);
-            byte[] imageData = CoverImageService.generateImage(playlistTitle);
             kafkaStringMessage.send(
                     KAFKA_TOPIC_SPOTIFY_PLAYLIST_UPDATED,
-                    objectMapper.writeValueAsString(new CoverImage(playlist.getId(), imageData))
+                    objectMapper.writeValueAsString(new SpotifyPlaylistDto(playlist.getId(), playlistTitle))
             );
         }
     }
