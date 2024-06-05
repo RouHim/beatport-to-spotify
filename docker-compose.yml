@@ -13,22 +13,34 @@ services:
       KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@localhost:9093
       # Listeners
       KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,EXTERNAL://localhost:9094
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:9094
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
       KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: true
 
-  cache:
+  redis:
     image: redis:alpine
-    restart: always
     ports:
       - "6379:6379"
 
-#  console:
-#    image: docker.redpanda.com/redpandadata/console:latest
-#    restart: on-failure
-#    ports:
-#      - 8080:8080
-#    environment:
-#      KAFKA_BROKERS: kafka:9092
+  beatport-to-spotify:
+    image: rouhim/beatport-to-spotify
+    build:
+      context: .
+      dockerfile: Containerfile
+    profiles:
+      - beatport-to-spotify
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      BEATPORT_URLS: https://www.beatport.com/genre/hard-dance-hardcore/8/top-100,https://www.beatport.com/genre/melodic-house-techno/90/top-100,https://www.beatport.com/genre/deep-house/12/top-100,https://www.beatport.com/genre/hard-techno/2/top-100,https://www.beatport.com/genre/psy-trance/13/top-100,https://www.beatport.com/genre/tech-house/11/top-100,https://www.beatport.com/genre/progressive-house/15/top-100,https://www.beatport.com/genre/trance-main-floor/7/top-100,https://www.beatport.com/genre/techno-peak-time-driving/6/top-100
+      GENERATE_COVER_IMAGE: true
+      SCHEDULE_RATE_MINUTES: 1440
+      SPOTIFY_AUTH_CODE: AQBScmxP8Y6kmOfO0deNMtchvjaoIxiePyfLwC1_-ppYgThX7i3kEvEakLsn8hwJT1Ixz2NZo67B8llD6xNMvmj_T9JnFgjtpxa_DDHHVQVGRnGqMYxJ7ZpClAcUSqyk19LG9PPfZUz-xiSjvWrqsO0mjKPIfPxBXliwekhuxdZAr1i6Gz6mTNYJ16xWGao5XSeO6fO34YL8BqpBhk_IrPdDgr_mMFaQMsOGSkWKGkHps3m9KkBrtHcUUw
+      SPOTIFY_CLIENT_ID: 1acc388cd9384d21a1d61fb90c4dca89
+      SPOTIFY_CLIENT_SECRET: 469897456daa4f7587ede94f421f60b8
+    depends_on:
+      - kafka
+      - redis

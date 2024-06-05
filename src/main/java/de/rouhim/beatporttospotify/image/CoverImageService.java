@@ -177,22 +177,28 @@ public class CoverImageService {
 
     private static void drawText(BufferedImage image, String text, Color color) {
         Graphics graphics = image.getGraphics();
-        int initialFontSize = 90;
-        Font font = new Font(FONT_NAME, Font.PLAIN, initialFontSize);
-        graphics.setFont(font);
         graphics.setColor(color);
+
+        // Set initial font size
+        int fontSize = 90;
+        Font font = new Font(FONT_NAME, Font.PLAIN, fontSize);
+        graphics.setFont(font);
+
         int textWidth = graphics.getFontMetrics().stringWidth(text);
 
+        // Decrease font size until text fits
         while (textWidth > 460) {
-            initialFontSize--;
-            font = new Font(FONT_NAME, Font.PLAIN, initialFontSize);
+            fontSize--;
+            font = new Font(FONT_NAME, Font.PLAIN, fontSize);
             graphics.setFont(font);
-            graphics.setColor(color);
             textWidth = graphics.getFontMetrics().stringWidth(text);
         }
 
+        // Calculate position to center text
         int x = 250 - (textWidth / 2);
         int y = 460;
+
+        // Draw the actual text
         graphics.drawString(text, x, y);
 
         graphics.dispose();

@@ -3,12 +3,10 @@ package de.rouhim.beatporttospotify.spotify;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 import de.rouhim.beatporttospotify.beatport.BeatportPlaylist;
 import de.rouhim.beatporttospotify.beatport.BeatportTrack;
 import de.rouhim.beatporttospotify.config.Settings;
 import de.rouhim.beatporttospotify.image.CoverImage;
-import de.rouhim.beatporttospotify.image.CoverImageService;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.PostConstruct;
 import org.apache.hc.client5.http.utils.Base64;
@@ -207,9 +205,6 @@ public class SpotifyService {
             logger.info("Found spotify playlist");
             Playlist playlist = spotifyApi.getPlaylist(playlistId.get()).build().execute();
 
-            logger.info("Deleting tracks from spotify playlist");
-            clearPlayList(playlist);
-
             logger.info("Adding tracks to spotify playlist");
             addTracksToPlaylist(playlist, beatportPlaylist.tracks());
 
@@ -241,7 +236,7 @@ public class SpotifyService {
             spotifyApi.setAccessToken(accessToken);
 
             Settings.savePersistentValue(Settings.PersistentValue.ACCESS_TOKEN, accessToken);
-        } catch (IOException | SpotifyWebApiException | ParseException e) {
+        } catch (Exception e) {
             logger.error("Could not refresh access token: {}", e.getMessage(), e);
         }
     }
@@ -326,24 +321,18 @@ public class SpotifyService {
                 .findFirst();
     }
 
-    private void clearPlayList(Playlist playlist) throws IOException, SpotifyWebApiException, ParseException {
-        JsonArray tracksToDelete = new JsonArray(100);
-        Arrays.stream(playlist.getTracks().getItems())
-                .map(track -> track.getTrack().getUri())
-                .toList()
-                .forEach(track -> {
-                    JsonObject element = new JsonObject();
-                    element.addProperty("uri", track);
-                    tracksToDelete.add(element);
-                });
-        if (!tracksToDelete.isEmpty()) {
-            spotifyApi.removeItemsFromPlaylist(playlist.getId(), tracksToDelete).build().execute();
-        } else {
-            logger.info("no tracks to delete");
-        }
+    private void addTracksToPlaylist(Playlist playlist, List<BeatportTrack> beatportTracks) throws Exception {
+        List<String> spotifyUris = determineSpotifyUris(beatportTracks);
+
+        JsonArray itemsToAdd = new JsonArray();
+        spotifyUris.forEach(itemsToAdd::add);
+
+        spotifyApi.replacePlaylistsItems(playlist.getId(), itemsToAdd).build().execute();
+
+        logger.info("Added {} tracks to spotify playlist.", spotifyUris.size());
     }
 
-    private void addTracksToPlaylist(Playlist playlist, List<BeatportTrack> beatportTracks) throws Exception {
+    private List<String> determineSpotifyUris(List<BeatportTrack> beatportTracks) throws IOException, ParseException, SpotifyWebApiException {
         List<String> spotifyUris = new ArrayList<>();
 
         for (BeatportTrack beatportTrack : beatportTracks) {
@@ -367,12 +356,7 @@ public class SpotifyService {
             }
         }
 
-        JsonArray itemsToAdd = new JsonArray();
-        spotifyUris.forEach(itemsToAdd::add);
-
-        spotifyApi.addItemsToPlaylist(playlist.getId(), itemsToAdd).build().execute();
-
-        logger.info("Added {} tracks to spotify playlist.", spotifyUris.size());
+        return spotifyUris;
     }
 
     @SuppressWarnings("DataFlowIssue")
