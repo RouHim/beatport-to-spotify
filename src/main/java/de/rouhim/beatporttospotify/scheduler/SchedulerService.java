@@ -24,8 +24,8 @@ public class SchedulerService {
         runTask();
     }
 
-    // every hour
-    @Scheduled(cron = "0 0 * * * *")
+    // every night
+    @Scheduled(cron = "0 0 0 * * *")
     public void runTask() {
         logger.info("Sending beatport parsing scheduled message");
         kafkaStringMessage.send(KAFKA_TOPIC_BEATPORT_PARSING_SCHEDULED, null);
