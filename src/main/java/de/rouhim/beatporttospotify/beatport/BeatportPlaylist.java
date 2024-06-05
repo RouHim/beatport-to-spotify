@@ -1,5 +1,4 @@
-package de.rouhim.bts.beatport;
-
+package de.rouhim.beatporttospotify.beatport;
 
 import java.util.List;
 

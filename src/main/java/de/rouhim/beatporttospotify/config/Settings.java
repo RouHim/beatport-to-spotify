@@ -1,16 +1,27 @@
-package de.rouhim.bts.settings;
+package de.rouhim.beatporttospotify.config;
 
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 public class Settings {
 
+    private static final Logger logger = LoggerFactory.getLogger(Settings.class);
+
     // Writes data to file
     public static void savePersistentValue(PersistentValue key, String value) {
+        if (!StringUtils.hasText(value)) {
+            logger.warn("Trying to save empty value for key: {}", key);
+            return;
+        }
+
         try {
             File dataDir = new File("./data");
             dataDir.mkdirs();
@@ -22,15 +33,16 @@ public class Settings {
     }
 
     // Reads data from file
-    public static String readPersistentValue(PersistentValue key) {
+    public static Optional<String> readPersistentValue(PersistentValue key) {
         try {
             File dataDir = new File("./data");
             dataDir.mkdirs();
             File file = new File(dataDir, key.name());
             if (!file.exists()) {
-                return "";
+                return Optional.empty();
             }
-            return FileUtils.readFileToString(file, "UTF-8");
+            String stringValue = FileUtils.readFileToString(file, "UTF-8");
+            return Optional.ofNullable(StringUtils.hasText(stringValue) ? stringValue : null);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -43,8 +55,8 @@ public class Settings {
     }
 
     // Reads the given env value as a String
-    public static String readString(EnvValue envValue) {
-        return System.getenv(envValue.name());
+    public static Optional<String> readString(EnvValue envValue) {
+        return Optional.ofNullable(System.getenv(envValue.name()));
     }
 
     // Reads the given env value as a bool
@@ -59,8 +71,22 @@ public class Settings {
         return Arrays.asList(value.split(","));
     }
 
+    /**
+     * Deletes the persistent value
+     */
+    public static void deletePersistentValue(PersistentValue persistentValue) {
+        try {
+            File dataDir = new File("./data");
+            dataDir.mkdirs();
+            File file = new File(dataDir, persistentValue.name());
+            file.delete();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public enum EnvValue {
-        ACCESS_TOKEN,
+        SPOTIFY_AUTH_CODE,
         BEATPORT_URLS,
         SCHEDULE_RATE_MINUTES,
         GENERATE_COVER_IMAGE,
@@ -69,6 +95,7 @@ public class Settings {
     }
 
     public enum PersistentValue {
+        ACCESS_TOKEN,
         REFRESH_TOKEN,
     }
 }
